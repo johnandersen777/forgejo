@@ -7,8 +7,8 @@ package admin
 import (
 	"net/http"
 
+	"code.gitea.io/gitea/models/application"
 	"code.gitea.io/gitea/models/db"
-	"code.gitea.io/gitea/models/organization"
 	user_model "code.gitea.io/gitea/models/user"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/web"
@@ -17,11 +17,11 @@ import (
 	"code.gitea.io/gitea/services/convert"
 )
 
-// CreateOrg api for create organization
-func CreateOrg(ctx *context.APIContext) {
-	// swagger:operation POST /admin/users/{username}/orgs admin adminCreateOrg
+// CreateApplication api for create application
+func CreateApplication(ctx *context.APIContext) {
+	// swagger:operation POST /admin/users/{username}/applications admin adminCreateApplication
 	// ---
-	// summary: Create an organization
+	// summary: Create an application
 	// consumes:
 	// - application/json
 	// produces:
@@ -29,59 +29,59 @@ func CreateOrg(ctx *context.APIContext) {
 	// parameters:
 	// - name: username
 	//   in: path
-	//   description: username of the user that will own the created organization
+	//   description: username of the user that will own the created application
 	//   type: string
 	//   required: true
-	// - name: organization
+	// - name: application
 	//   in: body
 	//   required: true
-	//   schema: { "$ref": "#/definitions/CreateOrgOption" }
+	//   schema: { "$ref": "#/definitions/CreateApplicationOption" }
 	// responses:
 	//   "201":
-	//     "$ref": "#/responses/Organization"
+	//     "$ref": "#/responses/Application"
 	//   "403":
 	//     "$ref": "#/responses/forbidden"
 	//   "422":
 	//     "$ref": "#/responses/validationError"
 
-	form := web.GetForm(ctx).(*api.CreateOrgOption)
+	form := web.GetForm(ctx).(*api.CreateApplicationOption)
 
 	visibility := api.VisibleTypePublic
 	if form.Visibility != "" {
 		visibility = api.VisibilityModes[form.Visibility]
 	}
 
-	org := &organization.Organization{
+	application := &application.Application{
 		Name:        form.UserName,
 		FullName:    form.FullName,
 		Description: form.Description,
 		Website:     form.Website,
 		Location:    form.Location,
 		IsActive:    true,
-		Type:        user_model.UserTypeOrganization,
+		Type:        user_model.UserTypeApplication,
 		Visibility:  visibility,
 	}
 
-	if err := organization.CreateOrganization(ctx, org, ctx.ContextUser); err != nil {
+	if err := application.CreateApplication(ctx, application, ctx.ContextUser); err != nil {
 		if user_model.IsErrUserAlreadyExist(err) ||
 			db.IsErrNameReserved(err) ||
 			db.IsErrNameCharsNotAllowed(err) ||
 			db.IsErrNamePatternNotAllowed(err) {
 			ctx.Error(http.StatusUnprocessableEntity, "", err)
 		} else {
-			ctx.Error(http.StatusInternalServerError, "CreateOrganization", err)
+			ctx.Error(http.StatusInternalServerError, "CreateApplication", err)
 		}
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, convert.ToOrganization(ctx, org))
+	ctx.JSON(http.StatusCreated, convert.ToApplication(ctx, application))
 }
 
-// GetAllOrgs API for getting information of all the organizations
-func GetAllOrgs(ctx *context.APIContext) {
-	// swagger:operation GET /admin/orgs admin adminGetAllOrgs
+// GetAllApplications API for getting information of all the applications
+func GetAllApplications(ctx *context.APIContext) {
+	// swagger:operation GET /admin/applications admin adminGetAllApplications
 	// ---
-	// summary: List all organizations
+	// summary: List all applications
 	// produces:
 	// - application/json
 	// parameters:
@@ -95,7 +95,7 @@ func GetAllOrgs(ctx *context.APIContext) {
 	//   type: integer
 	// responses:
 	//   "200":
-	//     "$ref": "#/responses/OrganizationList"
+	//     "$ref": "#/responses/ApplicationList"
 	//   "403":
 	//     "$ref": "#/responses/forbidden"
 
@@ -103,21 +103,21 @@ func GetAllOrgs(ctx *context.APIContext) {
 
 	users, maxResults, err := user_model.SearchUsers(ctx, &user_model.SearchUserOptions{
 		Actor:       ctx.Doer,
-		Type:        user_model.UserTypeOrganization,
+		Type:        user_model.UserTypeApplication,
 		OrderBy:     db.SearchOrderByAlphabetically,
 		ListOptions: listOptions,
 		Visible:     []api.VisibleType{api.VisibleTypePublic, api.VisibleTypeLimited, api.VisibleTypePrivate},
 	})
 	if err != nil {
-		ctx.Error(http.StatusInternalServerError, "SearchOrganizations", err)
+		ctx.Error(http.StatusInternalServerError, "SearchApplications", err)
 		return
 	}
-	orgs := make([]*api.Organization, len(users))
+	applications := make([]*api.Application, len(users))
 	for i := range users {
-		orgs[i] = convert.ToOrganization(ctx, organization.OrgFromUser(users[i]))
+		applications[i] = convert.ToApplication(ctx, application.ApplicationFromUser(users[i]))
 	}
 
 	ctx.SetLinkHeader(int(maxResults), listOptions.PageSize)
 	ctx.SetTotalCountHeader(maxResults)
-	ctx.JSON(http.StatusOK, &orgs)
+	ctx.JSON(http.StatusOK, &applications)
 }
